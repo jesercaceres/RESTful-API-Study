@@ -8,10 +8,13 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Data;
+import lombok.ToString;
 
+@ToString
 @Data
 @Entity
 @Table(name = "tbl_user")
@@ -25,9 +28,11 @@ public class User {
     private String email;
     @Column
     private String senha;
-
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Task> tarefas;
     
+    @ManyToMany(mappedBy = "usuarios", cascade = CascadeType.ALL)
+    private List<Task> tarefas;
+
+    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Task> tarefasCriadas;
 
 }

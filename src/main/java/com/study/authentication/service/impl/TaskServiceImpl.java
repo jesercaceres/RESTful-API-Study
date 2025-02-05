@@ -1,12 +1,16 @@
 package com.study.authentication.service.impl;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
 import com.study.authentication.dtos.TaskDTO;
+import com.study.authentication.dtos.UserDTO;
+import com.study.authentication.mappers.TaskMapper;
+import com.study.authentication.mappers.UserMapper;
 import com.study.authentication.model.Task;
 import com.study.authentication.model.User;
 import com.study.authentication.repository.TaskRepository;
@@ -14,6 +18,7 @@ import com.study.authentication.repository.UsuarioRepository;
 import com.study.authentication.service.TaskService;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.transaction.Transactional;
 
 @Service
 public class TaskServiceImpl implements TaskService {
@@ -27,27 +32,35 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public List<TaskDTO> findAll() {
+    @Transactional
+    // Este ID É o do usuário que listaremos todas as tarefas.
+    public List<TaskDTO> findAll(Long id) {
 
+        User user = usuarioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado."));
         List<Task> foundedTasks = taskRepository.findAll();
 
-        List<TaskDTO> returneTaskDTOs = foundedTasks.stream()
-                .map(task -> {
-                    TaskDTO taskDTO = new TaskDTO();
+        /*
+         * List<TaskDTO> returneTaskDTOs = foundedTasks.stream()
+         * .map(task -> {
+         * TaskDTO taskDTO = new TaskDTO();
+         * 
+         * taskDTO.setId(task.getId());
+         * taskDTO.setNome(task.getNome());
+         * taskDTO.setPrioridade(task.getPrioridade());
+         * taskDTO.setOwnerId(task.getOwner().getId());
+         * taskDTO.setDataCriacao(task.getDataCriacao());
+         * taskDTO.setDescricao(task.getDescricao());
+         * //taskDTO.setColaboradores
+         * 
+         * return taskDTO;
+         * 
+         * })
+         * .collect(Collectors.toList());
+         */
 
-                    taskDTO.setId(task.getId());
-                    taskDTO.setNome(task.getNome());
-                    taskDTO.setProioridade(task.getProioridade());
-                    taskDTO.setUserId(task.getId());
-                    taskDTO.setDataCriacao(task.getDataCriacao());
-                    taskDTO.setDescricao(task.getDescricao());
-
-                    return taskDTO; 
-
-                })
-                .collect(Collectors.toList());
-
-        return returneTaskDTOs;
+        List<TaskDTO> taskDTO = TaskMapper.INSTANCE.toTaskListDTO(foundedTasks);
+        return taskDTO;
     }
 
     @Override
@@ -59,9 +72,9 @@ public class TaskServiceImpl implements TaskService {
         taskDTO.setId(task.getId());
         taskDTO.setNome(task.getNome());
         taskDTO.setDescricao(task.getDescricao());
-        taskDTO.setProioridade(task.getProioridade());
+        taskDTO.setPrioridade(task.getPrioridade());
         taskDTO.setDataCriacao(task.getDataCriacao());
-        taskDTO.setUserId(task.getUser().getId());
+        taskDTO.setOwnerId(task.getOwner().getId());
 
         return taskDTO;
     }
@@ -77,8 +90,8 @@ public class TaskServiceImpl implements TaskService {
         if (taskDTO.getNome() != null) {
             task.setNome(taskDTO.getNome());
         }
-        if (taskDTO.getProioridade() != null) {
-            task.setProioridade(taskDTO.getProioridade());
+        if (taskDTO.getPrioridade() != null) {
+            task.setPrioridade(taskDTO.getPrioridade());
         }
 
         Task savedTask = taskRepository.save(task);
@@ -86,9 +99,9 @@ public class TaskServiceImpl implements TaskService {
         TaskDTO returnedTaskDTO = new TaskDTO();
         returnedTaskDTO.setId(savedTask.getId());
         returnedTaskDTO.setNome(savedTask.getNome());
-        returnedTaskDTO.setProioridade(savedTask.getProioridade());
+        returnedTaskDTO.setPrioridade(savedTask.getPrioridade());
         returnedTaskDTO.setDataCriacao(savedTask.getDataCriacao());
-        returnedTaskDTO.setUserId(savedTask.getUser().getId());
+        returnedTaskDTO.setOwnerId(savedTask.getOwner().getId());
 
         return returnedTaskDTO;
     }
@@ -103,27 +116,61 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public TaskDTO createTask(TaskDTO taskDTO) {
 
-        User user = usuarioRepository.findById(taskDTO.getUserId())
+        User user = usuarioRepository.findById(taskDTO.getOwnerId())
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-
         Task task = new Task();
 
         task.setNome(taskDTO.getNome());
-        task.setProioridade(taskDTO.getProioridade());
+        task.setPrioridade(taskDTO.getPrioridade());
         task.setDescricao(taskDTO.getDescricao());
         task.setDataCriacao(LocalDateTime.now());
-        task.setUser(user);
+        task.setOwner(user);
 
         Task savedTask = taskRepository.save(task);
 
         TaskDTO returnedTaskDTO = new TaskDTO();
         returnedTaskDTO.setId(savedTask.getId());
         returnedTaskDTO.setNome(savedTask.getNome());
-        returnedTaskDTO.setProioridade(savedTask.getProioridade());
+        returnedTaskDTO.setPrioridade(savedTask.getPrioridade());
         returnedTaskDTO.setDataCriacao(savedTask.getDataCriacao());
-        returnedTaskDTO.setUserId(savedTask.getUser().getId());
+        returnedTaskDTO.setOwnerId(savedTask.getOwner().getId());
 
         return returnedTaskDTO;
+    }
+
+    @Transactional
+    @Override
+    public TaskDTO addMoreUsers(Long taskId, List<Long> ids) {
+
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Tarefa não encontrada"));
+
+        List<User> existingUsers = usuarioRepository.findAllById(ids);
+
+        existingUsers.stream()
+                .filter(user -> !task.getUsuarios().contains(user))
+                .forEach(task.getUsuarios()::add);
+
+        Task savedTask = taskRepository.save(task);
+
+        List<UserDTO> existingUsersDTO = UserMapper.INSTANCE.toUserDTOList(existingUsers);
+
+        TaskDTO foundedTaskDTO = new TaskDTO();
+        foundedTaskDTO.setId(task.getId());
+        foundedTaskDTO.setNome(task.getNome());
+        foundedTaskDTO.setOwnerId(task.getOwner().getId());
+        foundedTaskDTO.setColaboradores(existingUsersDTO);
+        foundedTaskDTO.setDataCriacao(task.getDataCriacao());
+        foundedTaskDTO.setDescricao(task.getDescricao());
+        foundedTaskDTO.setPrioridade(task.getPrioridade());
+
+        /*
+         * if (foundedTaskDTO.getColaboradores() == null) {
+         * foundedTaskDTO.setColaboradores(new ArrayList<>());
+         * }
+         */
+
+        return foundedTaskDTO;
     }
 
 }

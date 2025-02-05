@@ -33,7 +33,7 @@ public class UserDTO {
     @Email
     private String email;
 
-    private String senha;
-
     private List<TaskDTO> tarefas;
+
+    private String senha;
 }

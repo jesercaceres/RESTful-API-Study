@@ -1,8 +1,11 @@
 package com.study.authentication.dtos;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.antlr.v4.runtime.misc.NotNull;
+
+import com.study.authentication.model.User;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -26,11 +29,16 @@ public class TaskDTO {
     @NotNull
     private String nome;
 
-    private String proioridade;
+    private String prioridade;
 
     private String descricao;
 
     private LocalDateTime dataCriacao;
 
-    private Long userId;
+    private Long ownerId;
+
+    private UserDTO ownerDTO;
+
+    private List<UserDTO> colaboradores;
+
 }
